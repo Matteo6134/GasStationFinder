@@ -1,68 +1,76 @@
-name: Build iOS Dev Client
+name: Build iOS IPA (AltStore Ready)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # Avvio manuale
 
 jobs:
   build:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: maxim-lobanov/setup-xcode@v1
-        with:
-          xcode-version: '16.2'
+    runs-on: macos-14 # Usa macOS Sonoma (supporta gli ultimi Xcode)
 
-      - name: Checkout repo
-        uses: actions/checkout@v3
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20 # Aggiornato per Expo 50+
 
-      - name: Install Expo & dependencies
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4' # Versione stabile per AltStore/iOS 17-18
+
+      - name: Install Dependencies
         run: |
-          npm install -g expo
-          npm ci
+          npm install -g eas-cli
+          npm install # Installa le dipendenze del progetto
 
-      - name: Add expo-dev-client
+      # Questo passaggio è necessario solo se non l'hai già fatto nel codice
+      - name: Install Expo Dev Client
         run: npx expo install expo-dev-client
-        
-      - name: Prebuild and Install CocoaPods
+
+      - name: Prebuild (Genera cartella iOS)
+        run: npx expo prebuild --platform ios --clean
+
+      - name: Install CocoaPods
         run: |
-          npx expo prebuild --platform ios --clean
           cd ios
-          pod install
-      
-      - name: Read app name from package.json
-        id: appname
+          pod install --repo-update
+
+      - name: Build Unsigned IPA
         run: |
-          RAW_NAME=$(jq -r .name package.json)
-          SAFE_NAME=$(echo $RAW_NAME | tr -cd '[:alnum:]_')
-          echo "APP_NAME=$SAFE_NAME" >> $GITHUB_ENV
-      
-      - name: Build iOS archive (unsigned)
-        run: |
-          xcodebuild \
-            -workspace ios/${{ env.APP_NAME }}.xcworkspace \
-            -scheme ${{ env.APP_NAME }} \
-            -configuration Debug clean archive \
+          cd ios
+          
+          # TRUCCO: Trova automaticamente il nome del workspace senza indovinarlo
+          WORKSPACE=$(find . -name "*.xcworkspace" | head -n 1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          
+          echo "Trovato Workspace: $WORKSPACE"
+          echo "Uso Schema: $SCHEME"
+
+          # Compila l'app senza firma (AltStore la firmerà dopo)
+          xcodebuild -workspace "$WORKSPACE" \
+            -scheme "$SCHEME" \
+            -configuration Debug \
             -sdk iphoneos \
-            -archivePath build/${{ env.APP_NAME }}.xcarchive \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            AD_HOC_CODE_SIGNING_ALLOWED=YES
 
-      - name: Export IPA
-        run: |
-          cd build/${{ env.APP_NAME }}.xcarchive/Products/Applications
+          # Crea il pacchetto .ipa
           mkdir -p Payload
-          cp -r ${{ env.APP_NAME }}.app Payload/
-          zip -r ${{ env.APP_NAME }}.ipa Payload
-          mv ${{ env.APP_NAME }}.ipa $GITHUB_WORKSPACE/
-      
-      - name: Upload .ipa
+          # Trova il file .app generato (il percorso può variare, lo cerchiamo)
+          APP_PATH=$(find build/Build/Products/Debug-iphoneos -name "*.app" | head -n 1)
+          
+          echo "Impacchetto l'app: $APP_PATH"
+          cp -r "$APP_PATH" Payload/
+          zip -r app-release.ipa Payload
+
+      - name: Upload IPA to GitHub
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.APP_NAME }}-ipa
-          path: ${{ env.APP_NAME }}.ipa
+          name: app-release-ios
+          path: ios/app-release.ipa
