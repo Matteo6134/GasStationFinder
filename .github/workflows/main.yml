@@ -7,56 +7,45 @@ jobs:
   build:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
-
-      # Usa l'ultima versione stabile di Xcode compatibile
+      - uses: actions/checkout@v2
       - uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: '16.2'
 
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 20
+          node-version: 18
 
-      - name: Install dependencies
-        run: npm install
-
-      # IMPORTANTE: Installa expo-dev-client se non è già nel package.json
-      - name: Install Expo Dev Client
-        run: npx expo install expo-dev-client
-
-      # Prebuild genera le cartelle natie (ios/android)
-      - name: Prebuild
-        run: npx expo prebuild --platform ios --clean
-
-      - name: Install CocoaPods
-        working-directory: ios
-        run: pod install
-
-      # --- FIX: TROVA IL NOME REALE DELLO SCHEMA ---
-      # Invece di leggere package.json, cerchiamo il file .xcworkspace generato
-      - name: Find Scheme Name
-        id: find_name
+      - name: Install Expo & dependencies
         run: |
-          cd ios
-          # Trova il primo file che finisce con .xcworkspace
-          WORKSPACE_FILE=$(find . -maxdepth 1 -name "*.xcworkspace" | head -n 1)
-          # Rimuove "./" e l'estensione ".xcworkspace" per ottenere il nome puro
-          SCHEME_NAME=$(basename "$WORKSPACE_FILE" .xcworkspace)
-          
-          echo "Trovato workspace: $WORKSPACE_FILE"
-          echo "Nome schema rilevato: $SCHEME_NAME"
-          
-          # Salva nelle variabili d'ambiente
-          echo "APP_NAME=$SCHEME_NAME" >> $GITHUB_ENV
+          npm install -g expo
+          npm ci
 
-      # Build usando il nome corretto trovato sopra
+      - name: Add expo-dev-client
+        run: npx expo install expo-dev-client
+        
+      - name: Prebuild and Install CocoaPods
+        run: |
+          npx expo prebuild --platform ios --clean
+          cd ios
+          pod install
+      
+      - name: Read app name from package.json
+        id: appname
+        run: |
+          RAW_NAME=$(jq -r .name package.json)
+          SAFE_NAME=$(echo $RAW_NAME | tr -cd '[:alnum:]_')
+          echo "APP_NAME=$SAFE_NAME" >> $GITHUB_ENV
+      
       - name: Build iOS archive (unsigned)
         run: |
           xcodebuild \
             -workspace ios/${{ env.APP_NAME }}.xcworkspace \
-            -scheme "${{ env.APP_NAME }}" \
+            -scheme ${{ env.APP_NAME }} \
             -configuration Debug clean archive \
             -sdk iphoneos \
             -archivePath build/${{ env.APP_NAME }}.xcarchive \
@@ -66,12 +55,11 @@ jobs:
 
       - name: Export IPA
         run: |
-          # Crea la cartella Payload necessaria per l'IPA
+          cd build/${{ env.APP_NAME }}.xcarchive/Products/Applications
           mkdir -p Payload
-          # Copia l'app compilata dentro Payload
-          cp -r build/${{ env.APP_NAME }}.xcarchive/Products/Applications/*.app Payload/
-          # Zippa tutto in un file .ipa
+          cp -r ${{ env.APP_NAME }}.app Payload/
           zip -r ${{ env.APP_NAME }}.ipa Payload
+          mv ${{ env.APP_NAME }}.ipa $GITHUB_WORKSPACE/
       
       - name: Upload .ipa
         uses: actions/upload-artifact@v4
