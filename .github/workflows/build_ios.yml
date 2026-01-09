@@ -1,18 +1,18 @@
 name: Build iOS IPA
 
 on:
-  workflow_dispatch: # Permette di avviare la build manualmente col pulsante
+  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest # Usa un Mac virtuale
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # Aggiorniamo anche questo per sicurezza
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4 # Aggiorniamo anche questo
         with:
           node-version: 18
 
@@ -22,16 +22,14 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build IPA with EAS (Local/Cloud logic)
-        # Qui sta il trucco: usiamo EAS per generare la build locale sul runner di GitHub
-        # Nota: Richiede un account Expo loggato o configurazione avanzata.
-        # SE USI IL METODO "ALTUX" PURO (senza Expo), lo script è diverso (vedi sotto).
+      - name: Build IPA with EAS
         run: |
-          # Esempio generico. Per Altux specifico segui il loro file .yml
+          # Inserisci qui i comandi di build specifici per il tuo progetto
+          # Se usi Altux, segui le loro istruzioni specifiche per questo step
           echo "Building..." 
 
       - name: Upload IPA
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4 # <--- FIX QUI
         with:
           name: app-release
-          path: ios/build/*.ipa # O il percorso dove finisce il file
+          path: ios/build/*.ipa
