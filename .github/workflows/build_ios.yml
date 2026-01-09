@@ -1,12 +1,12 @@
-name: Build iOS IPA
+name: Build iOS IPA (No Login Required)
 
 on:
-  workflow_dispatch: # Permette di avviare la build manualmente dal tab Actions
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build IPA
-    runs-on: macos-latest # Usa l'ultimo macOS stabile disponibile su GitHub
+    name: Create IPA
+    runs-on: macos-latest # Usa l'ultimo macOS (Sequoia/Sonoma nel 2026)
 
     steps:
       - name: Checkout repository
@@ -15,45 +15,54 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18 # O 20/22 a seconda del tuo progetto
+          node-version: 22
 
-      # Se usi Expo/EAS (Consigliato per React Native moderno)
-      - name: Setup EAS
-        uses: expo/expo-github-action@v8
+      - name: Setup Java (per Android tools se servono, altrimenti ignora)
+        uses: actions/setup-java@v4
         with:
-          eas-version: latest
-          token: ${{ secrets.EXPO_TOKEN }}
+          distribution: 'temurin'
+          java-version: '17'
 
       - name: Install dependencies
-        run: npm install # oppure 'yarn install' o 'bun install'
+        run: npm install
 
-      # Build con EAS (metodo moderno)
-      - name: Build with EAS
-        run: eas build --platform ios --profile production --local --output ./app.ipa --non-interactive
-        
-      # OPPURE: Build manuale con xcodebuild (Se non usi Expo/EAS)
-      # Decommenta queste righe solo se NON usi Expo
-      # - name: Setup Xcode
-      #   uses: maxim-lobanov/setup-xcode@v1
-      #   with:
-      #     xcode-version: '16.0' # Usa una versione reale (es. 16.0 o 15.4)
-      # - name: Build Archive
-      #   run: |
-      #     xcodebuild -workspace YourProject.xcworkspace \
-      #       -scheme YourScheme \
-      #       -sdk iphoneos \
-      #       -configuration Release \
-      #       -archivePath $PWD/build/YourApp.xcarchive \
-      #       clean archive \
-      #       CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
-      # - name: Export IPA
-      #   run: |
-      #     mkdir -p payload/Payload
-      #     mv build/YourApp.xcarchive/Products/Applications/*.app payload/Payload/
-      #     cd payload && zip -r ../YourApp.ipa Payload
+      # 1. GENERIAMO LE CARTELLE NATIVE (IOS/ANDROID)
+      - name: Expo Prebuild
+        run: npx expo prebuild --platform ios --no-interactive --clean
 
-      - name: Upload IPA Artifact
+      # 2. FIX FORZATO DELLA VERSIONE IOS (Sostituisce 26.3 con 18.0 per non far crashare Xcode)
+      - name: Fix iOS Version
+        run: |
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 26.3;/IPHONEOS_DEPLOYMENT_TARGET = 18.0;/g' ios/*.xcodeproj/project.pbxproj
+          sed -i '' "s/platform :ios, '26.3'/platform :ios, '18.0'/g" ios/Podfile || true
+
+      # 3. INSTALLIAMO I POD
+      - name: Install Pods
+        cd ios
+        run: pod install --repo-update
+        cd ..
+
+      # 4. BUILD MANUALE SENZA EAS (Non richiede login)
+      - name: Build xArchive
+        run: |
+          xcodebuild -workspace ios/GasStationFinder.xcworkspace \
+            -scheme GasStationFinder \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath $PWD/build/GasStationFinder.xcarchive \
+            archive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO
+
+      # 5. CREAZIONE IPA
+      - name: Export IPA
+        run: |
+          mkdir -p Payload
+          mv build/GasStationFinder.xcarchive/Products/Applications/GasStationFinder.app Payload/
+          zip -r GasStationFinder.ipa Payload
+
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: app-ipa
-          path: ./*.ipa
+          name: GasStationFinder-IPA
+          path: GasStationFinder.ipa
