@@ -31,7 +31,7 @@ jobs:
           echo "Building..." 
 
       - name: Upload IPA
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: ios/build/*.ipa # O il percorso dove finisce il file
