@@ -1,68 +1,68 @@
-name: Build iOS IPA (No Login Required)
+name: Build iOS Dev Client
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Create IPA
-    runs-on: macos-latest # Usa l'ultimo macOS (Sequoia/Sonoma nel 2026)
-
+    runs-on: macos-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v2
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '16.2'
+
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: 22
+          node-version: 18
 
-      - name: Setup Java (per Android tools se servono, altrimenti ignora)
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install dependencies
-        run: npm install
-
-      # 1. GENERIAMO LE CARTELLE NATIVE (IOS/ANDROID)
-      - name: Expo Prebuild
-        run: npx expo prebuild --platform ios --no-interactive --clean
-
-      # 2. FIX FORZATO DELLA VERSIONE IOS (Sostituisce 26.3 con 18.0 per non far crashare Xcode)
-      - name: Fix iOS Version
+      - name: Install Expo & dependencies
         run: |
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 26.3;/IPHONEOS_DEPLOYMENT_TARGET = 18.0;/g' ios/*.xcodeproj/project.pbxproj
-          sed -i '' "s/platform :ios, '26.3'/platform :ios, '18.0'/g" ios/Podfile || true
+          npm install -g expo
+          npm ci
 
-      # 3. INSTALLIAMO I POD
-      - name: Install Pods
-        cd ios
-        run: pod install --repo-update
-        cd ..
-
-      # 4. BUILD MANUALE SENZA EAS (Non richiede login)
-      - name: Build xArchive
+      - name: Add expo-dev-client
+        run: npx expo install expo-dev-client
+        
+      - name: Prebuild and Install CocoaPods
         run: |
-          xcodebuild -workspace ios/GasStationFinder.xcworkspace \
-            -scheme GasStationFinder \
-            -configuration Release \
+          npx expo prebuild --platform ios --clean
+          cd ios
+          pod install
+      
+      - name: Read app name from package.json
+        id: appname
+        run: |
+          RAW_NAME=$(jq -r .name package.json)
+          SAFE_NAME=$(echo $RAW_NAME | tr -cd '[:alnum:]_')
+          echo "APP_NAME=$SAFE_NAME" >> $GITHUB_ENV
+      
+      - name: Build iOS archive (unsigned)
+        run: |
+          xcodebuild \
+            -workspace ios/${{ env.APP_NAME }}.xcworkspace \
+            -scheme ${{ env.APP_NAME }} \
+            -configuration Debug clean archive \
             -sdk iphoneos \
-            -archivePath $PWD/build/GasStationFinder.xcarchive \
-            archive \
+            -archivePath build/${{ env.APP_NAME }}.xcarchive \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
 
-      # 5. CREAZIONE IPA
       - name: Export IPA
         run: |
+          cd build/${{ env.APP_NAME }}.xcarchive/Products/Applications
           mkdir -p Payload
-          mv build/GasStationFinder.xcarchive/Products/Applications/GasStationFinder.app Payload/
-          zip -r GasStationFinder.ipa Payload
-
-      - name: Upload IPA
+          cp -r ${{ env.APP_NAME }}.app Payload/
+          zip -r ${{ env.APP_NAME }}.ipa Payload
+          mv ${{ env.APP_NAME }}.ipa $GITHUB_WORKSPACE/
+      
+      - name: Upload .ipa
         uses: actions/upload-artifact@v4
         with:
-          name: GasStationFinder-IPA
-          path: GasStationFinder.ipa
+          name: ${{ env.APP_NAME }}-ipa
+          path: ${{ env.APP_NAME }}.ipa
