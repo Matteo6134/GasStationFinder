@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "GasStationFinder",
-    "slug": "GasStationFinder",
+    "name": "gasstationfinder",
+    "slug": "gasstationfinder",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -9,9 +9,23 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tuonome.gasstationfinder",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "location",
+          "fetch"
+        ],
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "L'app necessita della tua posizione anche in background per avvisarti dei distributori vicini mentre guidi.",
+        "NSLocationAlwaysUsageDescription": "L'app necessita della tua posizione anche in background per avvisarti dei distributori vicini mentre guidi.",
+        "NSLocationWhenInUseUsageDescription": "L'app usa la tua posizione per mostrarti i distributori.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.tuonome.gasstationfinder",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -19,7 +33,24 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "INSERISCI_QUI_LA_TUA_API_KEY_GOOGLE_MAPS"
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -39,11 +70,24 @@
           }
         }
       ],
-      "expo-maps"
+      "expo-maps",
+      [
+        "expo-location",
+        {
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5238fb14-6f26-46f3-87f7-8489dbed6828"
+      }
     }
   }
 }
