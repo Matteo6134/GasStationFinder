@@ -14,8 +14,6 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "location",
-          "fetch",
-          "location",
           "fetch"
         ],
         "NSLocationAlwaysAndWhenInUseUsageDescription": "L'app necessita della tua posizione anche in background per avvisarti dei distributori vicini mentre guidi.",
@@ -77,7 +75,8 @@
           "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": true
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,
